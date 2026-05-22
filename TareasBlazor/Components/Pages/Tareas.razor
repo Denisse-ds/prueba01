@@ -1,0 +1,223 @@
+﻿@page "/tareas"
+@using TareasBlazor.Data
+@using TareasBlazor.Models
+@using Microsoft.EntityFrameworkCore
+@inject TareasDbContext db
+
+
+
+<h3>📝 Gestión de Tareas</h3>
+
+<div class="mb-4">
+
+    <h4>➕ Nueva Tarea</h4>
+
+    <div class="mb-2">
+
+        <label>Título:</label>
+        <input class="form-control w-50 bg-light shadow-sm" @bind="nuevaTarea.Titulo" />
+
+    </div>
+
+    <div class="mb-2">
+
+        <label>Fecha de Vencimiento:</label>
+        <input type="date" class="form-control w-50 bg-light shadow-sm" @bind="nuevaTarea.FechaVencimiento" />
+
+    </div>
+
+    <button class="btn bg-info" @onclick="AgregarTarea">
+
+        ✓ Agregar Tarea
+
+    </button>
+
+    <hr />
+
+    <h4>📋 Mis Tareas (@tareas.Count)</h4>
+
+    @if (tareas.Count == 0)
+    {
+        <p>Necesitas agregar una tarea D:</p>
+    }
+    else
+    {
+        <div class="mt-5">
+
+            @foreach (var tarea in tareas)
+            {
+                <div class="mb-3 p-3 border rounded">
+
+                    <p><strong>ID:</strong> @tarea.Id</p>
+
+                    <p><strong>Título:</strong> @tarea.Titulo</p>
+
+                    <p><strong>Vence:</strong> @tarea.FechaVencimiento.ToShortDateString()</p>
+
+                    <p>
+                        <strong>Estado:</strong>
+                        @if (tarea.Completada)
+                        {
+                            <span class="text-info">✓ Completada</span>
+                        }
+                        else
+                        {
+                            <span class="text-warning">⏳ Pendiente</span>
+                        }
+                    </p>
+
+                    <div>
+                        <button class="btn btn-primary btn-sm me-2"
+                                @onclick="() => IniciarEdicion(tarea)">
+                            ✏️ Editar
+                        </button>
+
+                        <button class="btn btn-danger btn-sm"
+                                @onclick="() => EliminarTarea(tarea)">
+                            🗑️ Eliminar
+                        </button>
+                    </div>
+
+                </div>
+            }
+
+        </div>
+
+    }
+
+
+
+
+    @if (tareaEnEdicion != null)
+    {
+
+        <div class="card p-3 mt-3">
+
+          <h5>✏️ Editando Tarea #@tareaEnEdicion.Id</h5>
+
+           
+            <div class="mb-2">
+
+                <label>Título:</label>
+                <input class="form-control w-50 bg-light shadow-sm" @bind="tareaEnEdicion.Titulo" />
+
+            </div>
+
+            <div class="mb-2">
+
+                <label>Fecha:</label>
+                <input type="date" class="form-control w-50 bg-light shadow-sm" @bind="tareaEnEdicion.FechaVencimiento" />
+
+            </div>
+
+            <div class="form-check mb-2">
+
+                 <input type="checkbox" class="form-check-input" @bind="tareaEnEdicion.Completada" />
+                <label class="form-check-label mt-3">completada</label>
+
+            </div>
+
+            <div>
+
+                <button class="btn btn-success btn-sm me-2" @onclick="GuardarEdicion">
+
+                 ✓ Guardar Cambios
+
+                </button>
+
+                <button class="btn btn-secondary btn-sm" @onclick="CancelarEdicion">
+
+                ✗ Cancelar
+
+                </button>
+            </div>
+        </div>
+    }
+</div>
+
+
+
+
+
+<!-- 
+#################################
+#################################
+    CÓDIGO
+#################################
+#################################
+-->
+
+@code {
+    private Tarea nuevaTarea = new Tarea // Inicializamos con una fecha de vencimiento por defecto
+    {
+        FechaVencimiento = DateTime.Today.AddDays(1)
+    };
+
+    private List<Tarea> tareas = new List<Tarea>(); // Lista para almacenar las tareas cargadas desde la base de datos
+
+    protected override async Task OnInitializedAsync() // Método que se ejecuta al inicializar el componente
+    {
+        await CargarTareas();
+    }
+
+    private async Task CargarTareas() // Método para cargar las tareas desde la base de datos
+    {
+        tareas = await db.Tareas.ToListAsync(); // Utilizamos Entity Framework para obtener todas las tareas y almacenarlas en la lista
+    }
+
+    private async Task AgregarTarea() // Método para agregar una nueva tarea a la base de datos
+    {
+        if (!string.IsNullOrWhiteSpace(nuevaTarea.Titulo)) // Verificamos que el título no esté vacío o solo contenga espacios
+        {
+            db.Tareas.Add(nuevaTarea); 
+            await db.SaveChangesAsync();
+
+            await CargarTareas();
+
+            nuevaTarea = new Tarea // Reiniciamos el objeto nuevaTarea para limpiar el formulario, con una fecha de vencimiento por defecto
+            {
+                FechaVencimiento = DateTime.Today.AddDays(1)
+            };
+        }
+    }
+    private Tarea? tareaEnEdicion = null; // Variable para almacenar la tarea que se está editando actualmente
+    
+    private void IniciarEdicion(Tarea tarea) // Método para iniciar la edición de una tarea, asignando la tarea seleccionada a la variable tareaEnEdicion
+    {
+        tareaEnEdicion = tarea;
+    }
+    private async Task GuardarEdicion() // Método para guardar los cambios realizados en la tarea en edición, actualizando la base de datos y recargando la lista de tareas
+    {
+        if (tareaEnEdicion != null) // Verificamos que haya una tarea en edición antes de intentar guardar los cambios
+        {
+            await db.SaveChangesAsync(); // Guardamos los cambios realizados en la tarea en edición en la base de datos
+            tareaEnEdicion = null;
+            await CargarTareas(); // Recargamos la lista de tareas para reflejar los cambios realizados
+        }
+    }
+    
+    private void CancelarEdicion() // Método para cancelar la edición de una tarea, simplemente asignando null a la variable tareaEnEdicion para salir del modo de edición
+    {
+        tareaEnEdicion = null;
+    }
+    private async Task EliminarTarea(Tarea tarea)
+    {
+        db.Tareas.Remove(tarea); 
+        await db.SaveChangesAsync();
+        await CargarTareas();
+    }
+}
+
+<!--
+    BOOTSTRAP
+form-control: style para inputs, selects y textareas
+btn: estilo base para botones
+bg-color: Sirve para cambiar el color de fondo.
+shadow-sm: Agrega una sombra sutil para dar profundidad.
+mb, mt, ml, mr: Clases de margen (margin-bottom, margin-top, margin-left, margin-right) para espaciar elementos.
+border: Agrega un borde alrededor del elemento.
+rounded: Aplica bordes redondeados para un aspecto más suave.
+card: Estilo de tarjeta para agrupar contenido con un diseño limpio y organizado.
+padding : Clases como p-3 para agregar espacio interno alrededor del contenido dentro de un contenedor.
+form-check: Estilo para grupos de controles de formulario, como checkboxes y radios, para mejorar su apariencia y alineación.
+-->
